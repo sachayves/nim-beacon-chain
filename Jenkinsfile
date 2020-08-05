@@ -1,7 +1,3 @@
-import jenkins.model.CauseOfInterruption.UserInterruption
-import hudson.model.Result
-import hudson.model.Run
-
 pipeline {
   /* By parametrizing this we can run the same Jenkinsfile or different platforms */
   agent { label getAgentLabel() }
@@ -33,8 +29,6 @@ pipeline {
   stages {
     stage('Clone') {
       steps {
-        /* Abort older jobs if this is a PR build */
-        abortPreviousRunningBuilds()
         /* Checkout the source code */
         checkout scm
         sh 'echo "$MAKEFLAGS"'
@@ -144,28 +138,5 @@ def launchLocalTestnet(Integer testnetNum) {
     def dirName = "local_testnet${testnetNum}_data"
     sh "tar cjf ${dirName}.tar.bz2 ${dirName}/*.txt"
     archiveArtifacts("${dirName}.tar.bz2")
-  }
-}
-
-@NonCPS
-def abortPreviousRunningBuilds() {
-  /* Aborting makes sense only for PR builds, since devs start so many of them */
-  if (env.CHANGE_ID == null) {
-    println ">> Not aborting any previous jobs. Not a PR build."
-    return
-  }
-  Run previousBuild = currentBuild.rawBuild.getPreviousBuildInProgress()
-
-  while (previousBuild != null) {
-    if (previousBuild.isInProgress()) {
-      def executor = previousBuild.getExecutor()
-      if (executor != null) {
-        println ">> Aborting older build #${previousBuild.number}"
-        executor.interrupt(Result.ABORTED, new UserInterruption(
-          "newer build #${currentBuild.number}"
-        ))
-      }
-    }
-    previousBuild = previousBuild.getPreviousBuildInProgress()
   }
 }
