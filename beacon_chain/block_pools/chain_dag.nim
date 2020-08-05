@@ -442,7 +442,7 @@ func getRef*(dag: ChainDAGRef, root: Eth2Digest): BlockRef =
   dag.blocks.getOrDefault(root, nil)
 
 func getBlockRange*(
-    dag: ChainDAGRef, startSlot: Slot, skipStep: Natural,
+    dag: ChainDAGRef, startSlot: Slot, skipStep: uint64,
     output: var openArray[BlockRef]): Natural =
   ## This function populates an `output` buffer of blocks
   ## with a slots ranging from `startSlot` up to, but not including,
@@ -455,13 +455,17 @@ func getBlockRange*(
   ## at this index.
   ##
   ## If there were no blocks in the range, `output.len` will be returned.
-  let count = output.len
+  let requestedCount = output.len.uint64
   trace "getBlockRange entered",
-    head = shortLog(dag.head.root), count, startSlot, skipStep
+    head = shortLog(dag.head.root), requestedCount, startSlot, skipStep
 
   let
-    skipStep = max(1, skipStep) # Treat 0 step as 1
-    endSlot = startSlot + uint64(count * skipStep)
+    headSlot = dag.head.slot
+    runway = if headSlot > startSlot: uint64(headSlot - startSlot)
+             else: return output.len
+    skipStep = max(skipStep, 1) # Treat 0 step as 1
+    count = min(runway div skipStep, requestedCount)
+    endSlot = startSlot + count * skipStep
 
   var
     b = dag.head.atSlot(endSlot)
